@@ -85,3 +85,7 @@ result
 # tests
 /test/tmp/*
 /test/testrun
+
+# downloaded llvm
+llvm-*.7z
+llvm/*

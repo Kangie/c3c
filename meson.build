@@ -71,7 +71,36 @@ c3c_link_with = []
 
 # Default range in meson.options
 llvm_version_spec = get_option('llvm_version') # Enable users to specify a version of LLVM
-llvm_dep = dependency('llvm', required: get_option('with_llvm'), version: llvm_version_spec)
+
+# If on Windows we need to fetch the c3c LLVM; upstream LLVM packages are not suitable.
+if get_option('with_llvm').allowed() and host_machine.system() == 'windows'
+    # Just use the default version here; this means we're ignoring llvm_version_spec but we've never really respected it on Windows anyway.
+    windows_llvm_ver = '19.1.5'
+    arch = host_machine.cpu_family()
+    # Meson doesn't currently support 'case' statements, let's just fill in the ones we expect to be used.
+    if arch == 'aarch64'
+        arch = 'arm64'
+    elif arch == 'x86_64'
+        arch = 'x64'
+    endif
+    # generate the path programatically so that we don't need to update this file every time we update LLVM
+    llvm_dirname = f'llvm-@windows_llvm_ver@-windows-@arch@-msvc17-libcmt'
+    cmake_modpath = meson.project_source_root() / 'llvm' / llvm_dirname / 'lib' / 'cmake'
+    run_command(
+        'pwsh',
+        '-File',
+        './fetch_and_unpack_llvm_win.ps1',
+        '-Version',
+        f'@windows_llvm_ver@',
+        check: true
+    )
+    # We need to die here else there's no way that we can properly query LLVM features (etc), we _could_ define a fallback dependency manually
+    # but that's a lot of work for something that should never happen.
+    llvm_dep = dependency('llvm', required: true, version: windows_llvm_ver, method: 'cmake', cmake_module_path: cmake_modpath)
+else
+    llvm_dep = dependency('llvm', required: get_option('with_llvm'), version: llvm_version_spec)
+endif
+
 if llvm_dep.found()
     add_project_arguments('-DLLVM_AVAILABLE=1', language: 'c')
     llvm_bin_dir = llvm_dep.get_variable(configtool: 'bindir', cmake: 'LLVM_BINARY_DIR')
@@ -168,7 +197,6 @@ if llvm_dep.found()
         c3c_deps += xar_dep
     endif
 else
-    # TODO: In the old CMake script, Windows used to be able to fetch LLVM from the internet. Not implemented here but maybe a wrapdb thing could serve that purpose.
     add_project_arguments('-DLLVM_AVAILABLE=0', language: 'c') # a lot of `#if` used, so let's be safe.
 endif
 

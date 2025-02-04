@@ -34,12 +34,6 @@ jobs:
         with:
           python-version: '3.x'
 
-      # llvm-config isn't shipped in versions < 19.
-      - name: Install LLVM for Meson
-        if: matrix.build_system == 'meson'
-        run: |
-          choco install llvm --version 19.1.5
-
       - name: Install Meson
         if: matrix.build_system == 'meson'
         run: |
@@ -55,8 +49,6 @@ jobs:
             cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
             cmake --build build --config ${{ matrix.build_type }}
           } else {
-            $env:Path +=";C:\Program Files\LLVM\bin"
-            Get-ChildItem -Path "C:\Program Files\LLVM\bin"
             meson setup build --vsenv --buildtype $(("${{ matrix.build_type }}").ToLower()) --backend ninja -Dwith_llvm=enabled
             meson compile -C build
           }
